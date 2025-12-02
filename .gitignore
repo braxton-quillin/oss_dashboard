@@ -1,0 +1,16 @@
+.git/
+
+#python
+*.pyc
+.pytest_cache/
+
+#Logs and Data
+*.log
+*.sql
+*.sqlite
+*.sqlite3
+
+#virtual enviroment
+.env
+env/
+.venv/
