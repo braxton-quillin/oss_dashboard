@@ -17,17 +17,16 @@ def get_repo_health_metrics(repo_name):
     except GithubException:
         return {"error": "Repository not found or private."}
 
-    # Data Container
     metrics = {
         "repo_name": repo.full_name,
         "stars": repo.stargazers_count,
         "forks": repo.forks_count,
         "open_issues": repo.open_issues_count,
-        "avg_response_time_hours": 0,
-        "avg_pr_latency_days": 0,
-        "total_contributors": 0,
+        "avg_response_time_hours": 0,  # dt from issue to first comment
+        "avg_pr_latency_days": 0,  # dt from issue to first comment
+        "total_contributors": 0,  # related to 'truck factor'??
         "total_commits_last_year": 0,
-    }
+    }  ##add truck factor
 
     # Response Time (Time to first comment on Issues)
     issues = repo.get_issues(state="closed", sort="created", direction="desc")[:20]
