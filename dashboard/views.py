@@ -12,6 +12,6 @@ def dashboard_home(request):
         context["data"] = data
         context["search_term"] = search_query
     else:
-        context["search_term"] = "pallets/flask"
+        context["search_term"] = ""
 
-    return render(request, "dashboard/index.html", context)
+    return render(request, "index.html", context)

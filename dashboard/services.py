@@ -9,10 +9,6 @@ load_dotenv()
 
 
 def get_repo_health_metrics(repo_name):
-    """
-    Analyzes a GitHub repository and returns health metrics.
-    repo_name example: "django/django" or "torvalds/linux"
-    """
     token = os.getenv("GITHUB_TOKEN")
     g = Github(token)
 
@@ -21,6 +17,7 @@ def get_repo_health_metrics(repo_name):
     except GithubException:
         return {"error": "Repository not found or private."}
 
+    # Data Container
     metrics = {
         "repo_name": repo.full_name,
         "stars": repo.stargazers_count,
@@ -28,10 +25,11 @@ def get_repo_health_metrics(repo_name):
         "open_issues": repo.open_issues_count,
         "avg_response_time_hours": 0,
         "avg_pr_latency_days": 0,
+        "total_contributors": 0,
+        "total_commits_last_year": 0,
     }
 
-    # METRIC 1: Response Time
-    # analyze the last 20 closed issues to get a recent snapshot
+    # Response Time (Time to first comment on Issues)
     issues = repo.get_issues(state="closed", sort="created", direction="desc")[:20]
     response_times = []
 
@@ -53,8 +51,7 @@ def get_repo_health_metrics(repo_name):
         avg_seconds = statistics.mean(response_times)
         metrics["avg_response_time_hours"] = round(avg_seconds / 3600, 2)
 
-    # METRIC 2: Review Latency
-    # analyze the last 20 closed PRs
+    # METRIC 2: Review Latency (Time to Merge/Close PRs)
     pulls = repo.get_pulls(state="closed", sort="created", direction="desc")[:20]
     pr_latencies = []
 
@@ -69,5 +66,23 @@ def get_repo_health_metrics(repo_name):
     if pr_latencies:
         avg_seconds = statistics.mean(pr_latencies)
         metrics["avg_pr_latency_days"] = round(avg_seconds / 86400, 2)
+
+    # METRIC 3 & 4: Contributor Activity
+    try:
+        # Fetch Total Contributors
+        metrics["total_contributors"] = repo.get_contributors().totalCount
+
+        # Fetch Commit Activity (Last 52 weeks)
+        commit_activity = repo.get_stats_commit_activity()
+
+        # Calculate the total number of commits
+        total_commits = sum(week.total for week in commit_activity)
+        metrics["total_commits_last_year"] = total_commits
+
+    except Exception as e:
+        # Handle cases where statistics are still processing or unavailable
+        print(f"Warning: Could not fetch commit statistics. Error: {e}")
+        metrics["total_contributors"] = "N/A"
+        metrics["total_commits_last_year"] = "N/A"
 
     return metrics

@@ -18,6 +18,15 @@
         .metric-card:hover {
             transform: translateY(-3px);
         }
+
+        /* Style for the embedded frame */
+        .github-embed {
+            border: 1px solid #dee2e6;
+            width: 100%;
+            height: 800px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, .1);
+            border-radius: .3rem;
+        }
     </style>
 </head>
 
@@ -43,19 +52,34 @@
             </div>
         </div>
 
-        {% if data %}
-        {% if data.error %}
-        <div class="alert alert-danger" role="alert">
-            <h4 class="alert-heading">Error!</h4>
-            <p>{{ data.error }}</p>
-            <hr>
-            <p class="mb-0">Please check the repository name or your GitHub Token (rate limits may apply).</p>
-        </div>
-        {% else %}
+        {% if data and not data.error %}
         <h2 class="mb-4">Metrics for: **{{ data.repo_name }}**</h2>
 
-        <div class="row">
-            <div class="col-md-6 col-lg-3 mb-4">
+        <div class="row mb-4">
+
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card metric-card border-info">
+                    <div class="card-body">
+                        <h5 class="card-title text-info">Annual Commit Volume</h5>
+                        <h1 class="card-text">{{ data.total_commits_last_year|default:"N/A" }}</h1>
+                        <p class="card-text text-muted">Total Commits</p>
+                        <p class="card-text text-small text-secondary">Work committed in the last 12 months.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card metric-card border-success">
+                    <div class="card-body">
+                        <h5 class="card-title text-success">Total Contributors</h5>
+                        <h1 class="card-text">{{ data.total_contributors|default:"N/A" }}</h1>
+                        <p class="card-text text-muted">Unique Developers</p>
+                        <p class="card-text text-small text-secondary">Breadth of the community.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-4 mb-4">
                 <div class="card metric-card border-primary">
                     <div class="card-body">
                         <h5 class="card-title text-primary">Community Size</h5>
@@ -65,22 +89,24 @@
                     </div>
                 </div>
             </div>
+        </div>
+        <div class="row mb-4">
 
-            <div class="col-md-6 col-lg-3 mb-4">
-                <div class="card metric-card border-info">
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card metric-card border-secondary">
                     <div class="card-body">
-                        <h5 class="card-title text-info">Open Issues</h5>
+                        <h5 class="card-title text-secondary">Open Issues</h5>
                         <h1 class="card-text">{{ data.open_issues|default:"N/A" }}</h1>
                         <p class="card-text text-muted">Open Tickets</p>
-                        <p class="card-text text-small text-secondary">A measure of current workload.</p>
+                        <p class="card-text text-small text-secondary">Current backlog/workload.</p>
                     </div>
                 </div>
             </div>
 
-            <div class="col-md-6 col-lg-3 mb-4">
-                <div class="card metric-card border-success">
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card metric-card border-warning">
                     <div class="card-body">
-                        <h5 class="card-title text-success">Avg. Response Time</h5>
+                        <h5 class="card-title text-warning">Avg. Response Time</h5>
                         <h1 class="card-text">{{ data.avg_response_time_hours|default:"N/A" }}</h1>
                         <p class="card-text text-muted">Hours</p>
                         <p class="card-text text-small text-secondary">Time to first comment on closed issues.</p>
@@ -88,10 +114,10 @@
                 </div>
             </div>
 
-            <div class="col-md-6 col-lg-3 mb-4">
-                <div class="card metric-card border-warning">
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card metric-card border-danger">
                     <div class="card-body">
-                        <h5 class="card-title text-warning">Avg. Review Latency</h5>
+                        <h5 class="card-title text-danger">Avg. Review Latency</h5>
                         <h1 class="card-text">{{ data.avg_pr_latency_days|default:"N/A" }}</h1>
                         <p class="card-text text-muted">Days</p>
                         <p class="card-text text-small text-secondary">Time from PR creation to merge/close.</p>
@@ -99,18 +125,28 @@
                 </div>
             </div>
         </div>
-        <div class="alert alert-secondary mt-4">
-            <small>
-                **Note:** Metrics are based on the **last 20 closed issues/PRs** to prevent GitHub API rate limits.
-                A lower number for Response Time and Review Latency indicates a **healthier, more active** repository.
-            </small>
-        </div>
-        {% endif %}
-        {% else %}
-        <div class="alert alert-info" role="alert">
-            Enter a repository name (e.g., `torvalds/linux`) and click Analyze to view its health metrics!
-        </div>
-        {% endif %}
+        <h2 class="mb-3">Repository Overview</h2>
+        {% with image_url="https://opengraph.githubassets.com/<any_hash_number>/"|add:data.repo_name %}
+            {% with github_url="https://github.com/"|add:data.repo_name %}
+            <div class="mb-4">
+                <a href="{{ github_url }}"><img src="{{ image_url }}" width="50%"></a>
+            </div>
+            {% endwith %}
+            {% endwith %}
+
+            {% else %}
+            <div class="alert {% if data.error %}alert-danger{% else %}alert-info{% endif %}" role="alert">
+                {% if data.error %}
+                <h4 class="alert-heading">Error!</h4>
+                <p>{{ data.error }}</p>
+                <hr>
+                <p class="mb-0">Please check the repository name or your GitHub Token (rate limits may apply).</p>
+                {% else %}
+                Enter a repository name (e.g., `Snapchat/Valdi`) and click Analyze to view its health metrics! *note
+                restrictions based on GitHUb's API, such as Linux having too many contributors to display
+                {% endif %}
+            </div>
+            {% endif %}
 
     </div>
 
