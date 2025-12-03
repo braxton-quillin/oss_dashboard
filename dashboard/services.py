@@ -18,30 +18,61 @@ def get_repo_health_metrics(repo_name):
     token = os.getenv("GITHUB_TOKEN")
     g = Github(token)
 
+    rate_limit = g.get_rate_limit()
+
+    try:
+        rate_limit_remaining = rate_limit.resources.core.remaining
+    except AttributeError:
+        # Fallback for unexpected structure
+        rate_limit_remaining = getattr(rate_limit.core, "remaining", 0)
+
+    if rate_limit_remaining < 5:  # Halt if limit is nearly exhausted
+        return {
+            "error": f"API Rate Limit Warning: Only {rate_limit_remaining} requests remaining. Please wait one hour or provide a new token.",
+            "rate_limit_remaining": rate_limit_remaining,
+        }
+
     try:
         repo = g.get_repo(repo_name)
-    except GithubException:
-        return {"error": "Repository not found or private."}
+    except GithubException as e:
+        error_msg = (
+            f"Repository not found, private, or unknown GitHub error: {e.status}"
+        )
+        return {"error": error_msg, "rate_limit_remaining": rate_limit_remaining}
 
-    # Data Container
+    # Data Container (Updated with all new metrics)
     metrics = {
         "repo_name": repo.full_name,
         "stars": repo.stargazers_count,
         "forks": repo.forks_count,
         "open_issues": repo.open_issues_count,
-        "avg_response_time_hours": 0,
-        "avg_pr_latency_days": 0,
-        # --- NEW/UPDATED METRICS HERE ---
-        "total_contributors": 0,
-        "bus_factor": "N/A",  # Initialize Bus Factor
-        # -----------------------------
+        "avg_response_time_hours": "N/A",
+        "avg_pr_latency_days": "N/A",
+        "total_contributors": "N/A",
+        "bus_factor": "N/A",
+        "rate_limit_remaining": rate_limit_remaining,
+        "last_commit_date": "N/A",
+        "avg_issue_age_days": "N/A",
+        "health_percentage": 0,
+        "language": repo.language or "N/A",
+        "license": repo.license.name if repo.license else "Unspecified",
+        "bus_factor_color": "secondary",
+        "response_time_color": "secondary",
+        "latency_color": "secondary",
+        "health_color": "secondary",
+        "age_color": "secondary",
     }
 
+    if repo.pushed_at:
+        metrics["last_commit_date"] = repo.pushed_at.strftime("%b %d, %Y")
+
     # --- METRIC 1: Response Time (Time to first comment on Issues) ---
-    issues = repo.get_issues(state="closed", sort="created", direction="desc")[:20]
+    issues_closed = repo.get_issues(state="closed", sort="created", direction="desc")[
+        :20
+    ]
     response_times = []
-    # ... (existing calculation logic for response_times remains the same) ...
-    for issue in issues:
+
+    for issue in issues_closed:
         if issue.pull_request:
             continue
 
@@ -55,10 +86,24 @@ def get_repo_health_metrics(repo_name):
         avg_seconds = statistics.mean(response_times)
         metrics["avg_response_time_hours"] = round(avg_seconds / 3600, 2)
 
+    issues_open = repo.get_issues(state="open", sort="created", direction="desc")
+    issue_ages = []
+    now = datetime.now(timezone.utc)
+
+    for issue in issues_open:
+        if issue.pull_request:
+            continue
+        delta = now - issue.created_at
+        issue_ages.append(delta.total_seconds())
+
+    if issue_ages:
+        avg_seconds = statistics.mean(issue_ages)
+        metrics["avg_issue_age_days"] = round(avg_seconds / 86400, 1)
+
     # --- METRIC 2: Review Latency (Time to Merge/Close PRs) ---
     pulls = repo.get_pulls(state="closed", sort="created", direction="desc")[:20]
     pr_latencies = []
-    # ... (existing calculation logic for pr_latencies remains the same) ...
+
     for pr in pulls:
         end_time = pr.merged_at if pr.merged else pr.closed_at
 
@@ -109,10 +154,72 @@ def get_repo_health_metrics(repo_name):
         if total_additions == 0:
             metrics["bus_factor"] = 1
 
-    except Exception as e:
-        # This can happen if statistics are still processing (GitHub 202 error)
-        print(f"Warning: Could not calculate Bus Factor/Contributor stats. Error: {e}")
-        metrics["total_contributors"] = "N/A"
-        metrics["bus_factor"] = "N/A"
+    except GithubException as e:
+        if e.status == 202:
+            metrics["bus_factor"] = "Processing..."
+            metrics["total_contributors"] = "Processing..."
+        else:
+            # Handle other GitHubExceptions
+            metrics["bus_factor"] = "N/A"
+            metrics["total_contributors"] = "N/A"
+
+    try:
+        # Fetching community profile metrics
+        community_profile = repo.get_community_profile()
+        # The API returns an int score (e.g., 50 for 50%).
+        metrics["health_percentage"] = community_profile.health_percentage or 0
+    except Exception:
+        metrics["health_percentage"] = (
+            0  # Default to 0 if API fails or profile is missing
+        )
+
+    # 1. Bus Factor Color
+    bus_factor_level = metrics["bus_factor"]
+    if isinstance(bus_factor_level, int):
+        if bus_factor_level < 3:
+            metrics["bus_factor_color"] = "danger"  # Red (High Risk)
+        elif bus_factor_level < 10:
+            metrics["bus_factor_color"] = "warning"  # Yellow (Moderate Risk)
+        else:
+            metrics["bus_factor_color"] = "success"  # Green (Low Risk)
+
+    # 2. Avg. Response Time Color (Hours)
+    response_time_level = metrics["avg_response_time_hours"]
+    if isinstance(response_time_level, (int, float)):
+        if response_time_level < 24:
+            metrics["response_time_color"] = "success"  # Green (Fast)
+        elif response_time_level < 72:
+            metrics["response_time_color"] = "warning"  # Yellow (Acceptable)
+        else:
+            metrics["response_time_color"] = "danger"  # Red (Slow)
+
+    # 3. Avg. Review Latency Color (Days)
+    latency_level = metrics["avg_pr_latency_days"]
+    if isinstance(latency_level, (int, float)):
+        if latency_level < 3:
+            metrics["latency_color"] = "success"  # Green (Fast)
+        elif latency_level < 7:
+            metrics["latency_color"] = "warning"  # Yellow (Acceptable)
+        else:
+            metrics["latency_color"] = "danger"  # Red (Slow)
+
+    # 4. Community Health Score Color (Percentage)
+    health_level = metrics["health_percentage"]
+    if health_level >= 80:
+        metrics["health_color"] = "success"  # Green (High Score)
+    elif health_level >= 50:
+        metrics["health_color"] = "warning"  # Yellow (Moderate Score)
+    else:
+        metrics["health_color"] = "danger"  # Red (Low Score)
+
+    # 5. Avg. Open Issue Age Color (Days)
+    issue_age_level = metrics["avg_issue_age_days"]
+    if isinstance(issue_age_level, (int, float)):
+        if issue_age_level < 30:
+            metrics["age_color"] = "success"  # Green (Young Issues)
+        elif issue_age_level < 90:
+            metrics["age_color"] = "warning"  # Yellow (Aging Backlog)
+        else:
+            metrics["age_color"] = "danger"  # Red (Stale Backlog)
 
     return metrics
