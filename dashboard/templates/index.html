@@ -58,23 +58,24 @@
         <div class="row mb-4">
 
             <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card metric-card border-info">
+                <div class="card metric-card border-danger">
                     <div class="card-body">
-                        <h5 class="card-title text-info">Annual Commit Volume</h5>
-                        <h1 class="card-text">{{ data.total_commits_last_year|default:"N/A" }}</h1>
-                        <p class="card-text text-muted">Total Commits</p>
-                        <p class="card-text text-small text-secondary">Work committed in the last 12 months.</p>
+                        <h5 class="card-title text-danger">This week's Bus Factor</h5>
+                        <h1 class="card-text">{{ data.bus_factor|default:"N/A" }}</h1>
+                        <p class="card-text text-muted">Core Maintainers</p>
+                        <p class="card-text text-small text-secondary">Developers responsible for 50% of code additions.
+                        </p>
                     </div>
                 </div>
             </div>
 
             <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card metric-card border-success">
+                <div class="card metric-card border-info">
                     <div class="card-body">
-                        <h5 class="card-title text-success">Total Contributors</h5>
+                        <h5 class="card-title text-info">Total Contributors</h5>
                         <h1 class="card-text">{{ data.total_contributors|default:"N/A" }}</h1>
                         <p class="card-text text-muted">Unique Developers</p>
-                        <p class="card-text text-small text-secondary">Breadth of the community.</p>
+                        <p class="card-text text-small text-secondary">Size of the community.</p>
                     </div>
                 </div>
             </div>
@@ -90,6 +91,7 @@
                 </div>
             </div>
         </div>
+
         <div class="row mb-4">
 
             <div class="col-md-6 col-lg-4 mb-4">
@@ -115,9 +117,9 @@
             </div>
 
             <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card metric-card border-danger">
+                <div class="card metric-card border-success">
                     <div class="card-body">
-                        <h5 class="card-title text-danger">Avg. Review Latency</h5>
+                        <h5 class="card-title text-success">Avg. Review Latency</h5>
                         <h1 class="card-text">{{ data.avg_pr_latency_days|default:"N/A" }}</h1>
                         <p class="card-text text-muted">Days</p>
                         <p class="card-text text-small text-secondary">Time from PR creation to merge/close.</p>
@@ -125,6 +127,7 @@
                 </div>
             </div>
         </div>
+
         <h2 class="mb-3">Repository Overview (https://opengraph.githubassets.com/)</h2>
         {% with image_url="https://opengraph.githubassets.com/<any_hash_number>/"|add:data.repo_name %}
             {% with github_url="https://github.com/"|add:data.repo_name %}
